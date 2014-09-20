@@ -56,9 +56,7 @@ struct SystemState{
   unsigned char B3_Gefahr;
 };
 
-
-
-struct SystemState previous;
+struct SystemState old_state;
 
 
 /*
@@ -72,18 +70,45 @@ unsigned char read_button(unsigned char pin)
 /*
  Extra function, we will need debouncing
 */
-unsigned char read_slide(unsigned char pin) 
+int read_slide(unsigned char pin) 
 {
   return analogRead(pin);
 }
 
 
+/** Send state over Serial (debug !)
+*
+*
+*
+**/
+void print_state(struct SystemState state)
+{
+  Serial.print("Debug: BTN Musik:  ");
+  Serial.println (state.B1_Musik);
+  Serial.print("Debug: BTN Vakuum:  ");
+  Serial.println (state.B1_Vakuum);
+  Serial.print("Debug: BTN Radon:  ");
+  Serial.println (state.B1_Radon);
+  Serial.print("Debug: BTN Schrott:  ");
+  Serial.println (state.B2_Schrott);
+  Serial.print("Debug: BTN Schott:  ");
+  Serial.println (state.B2_Schott);
+  Serial.print("Debug: BTN Evak:  ");
+  Serial.println (state.B3_Evak);
+  Serial.print("Debug: BTN Radium:  ");
+  Serial.println (state.B3_Radium);
+  Serial.print("Debug: BTN Gefahr:  ");
+  Serial.println (state.B3_Gefahr);
+  Serial.print("Debug: BTN Sitzheizung:  ");
+  Serial.println (state.B2_SitzHeizung);
+}
 
 /*
 Read the current state
 */
 struct SystemState read_state() {
   struct SystemState state;
+  int regler=0;
   
   state.B1_Musik = read_button(Box1_Button_gruen);
   state.B1_Vakuum = read_button(Box1_Button_blau);
@@ -94,9 +119,10 @@ struct SystemState read_state() {
   state.B3_Radium = read_button(Box3_Button_blau);
   state.B3_Gefahr = read_button(Box3_Schloss);
   
-  if  ((read_slide(Box2_Regler)) < 55)
+  regler = read_slide(Box2_Regler);
+  if  (regler < 55)
     state.B2_SitzHeizung = 1;
-  else if  ((read_slide(Box2_Regler)) < 90)
+  else if  (regler < 90)
     state.B2_SitzHeizung = 2;
   else
     state.B2_SitzHeizung = 3;
@@ -109,16 +135,49 @@ struct SystemState read_state() {
 * return: True if states match, False else
 */
 boolean state_matches(struct SystemState s1, struct SystemState s2)
-{}
+{
+  if (s1.B1_Musik != s2.B1_Musik)
+    return false;
+  if (s1.B1_Vakuum != s2.B1_Vakuum)
+    return false;
+  if (s1.B1_Radon != s2.B1_Radon)
+    return false;
+  if (s1.B2_Schrott != s2.B2_Schrott)
+    return false;
+  if (s1.B2_Schott != s2.B2_Schott)
+    return false;
+  if (s1.B3_Evak != s2.B3_Evak)
+    return false;
+  if (s1.B3_Radium != s2.B3_Radium)
+    return false;
+  if (s1.B3_Gefahr != s2.B3_Gefahr)
+    return false;
+  if (s1.B2_SitzHeizung != s2.B2_SitzHeizung)
+    return false;
+
+  return true;
+  
+}
 
 /** Compare the current state to 2 possible states
 *
-* return: 0: first state, 1: second state, 3: Wrong state
+* return: 0: first state, 1: second state, 2: Wrong state
 **/
 unsigned char compare_state(struct SystemState prev, struct SystemState next)
 {
-
+  struct SystemState current;
+  
+  current = read_state();
+  
+  if (state_matches(current, prev))
+    return 0;
+  if (state_matches(current, next))
+    return 1;
+    
+  return 2;
 }
+
+
 
 String inputString = "";         // a string to hold incoming data
 
@@ -165,6 +224,8 @@ void loop() {
   {
     Serial.print("status_");
     Serial.println (operationMode);
+    old_state = read_state();
+    print_state(old_state);
   }
 
   if (operationMode == enabled)
