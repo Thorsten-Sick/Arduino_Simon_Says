@@ -56,14 +56,27 @@ struct SystemState{
   unsigned char B3_Gefahr;
 };
 
-struct SystemState old_state;
+const String Musik_string = String("Musik aus um Strom zu sparen");
+const String Vakuum_string = String("Vakuum in Dunkelkammer einlassen");
+const String Radon_string = String("Radon magnetisieren");
+const String Schrott_string = String("Schrott abwerfen");
+const String Schott_string = String("Schott schliessen");
+const String Evak_string = String("Evakuierung vorbereiten");
+const String Radium_string = String("Radium inhalator vorbereiten");
+const String Gefahr_string = String("Gefahren - Anzeige aus um Panik zu vermeiden");
 
+const String SH_low_string = String("Sitzheizung auf Low");
+const String SH_medium_string = String("Sitzheizung auf Medium");
+const String SH_high_string = String("Sitzheizung auf High");
+
+String current_task = String();
 
 /*
  Extra function, we will need debouncing
 */
 unsigned char read_button(unsigned char pin) 
 {
+  
   return digitalRead(pin);
 }
 
@@ -74,6 +87,7 @@ int read_slide(unsigned char pin)
 {
   return analogRead(pin);
 }
+
 
 
 /** Send state over Serial (debug !)
@@ -102,6 +116,127 @@ void print_state(struct SystemState state)
   Serial.print("Debug: BTN Sitzheizung:  ");
   Serial.println (state.B2_SitzHeizung);
 }
+
+/** Announce a task to do
+*
+**/
+void announce(String message)
+{
+  lcd.setCursor(0, 1);
+  lcd.print(message);
+}
+
+long old_changeme = -1;
+
+/* Generate a new state with only a small difference
+*
+*/
+
+struct SystemState randomize_next_state(struct SystemState current)
+{
+  struct SystemState next;
+  long changeme;
+  
+  // Copy current
+  next.B1_Musik = current.B1_Musik;
+  next.B1_Vakuum = current.B1_Vakuum;
+  next.B1_Radon = current.B1_Radon;
+  next.B2_Schrott = current.B2_Schrott;
+  next.B2_Schott = current.B2_Schott;
+  next.B3_Evak = current.B3_Evak;
+  next.B3_Radium = current.B3_Radium;
+  next.B3_Gefahr = current.B3_Gefahr;
+  next.B2_SitzHeizung = current.B2_SitzHeizung;
+  
+  // Identify button to change
+  
+  while (changeme == old_changeme)
+  {
+    changeme = random(0,8);  
+  }
+  old_changeme = changeme;
+
+  Serial.print("Debug: Randomizing....");
+  Serial.println(changeme);
+  
+  // modify and announce
+  switch (changeme){
+    case 0:
+      next.B1_Musik = ! next.B1_Musik;
+      announce(Musik_string);
+      current_task = Musik_string;
+      break;
+    case 1:
+      next.B1_Vakuum = ! next.B1_Vakuum;
+      announce(Vakuum_string);
+      current_task = Vakuum_string;
+      break;
+    case 2:
+      next.B1_Radon = ! next.B1_Radon;
+      announce(Radon_string);
+      current_task = Radon_string;
+      break;
+    case 3:
+      next.B2_Schrott = ! next.B2_Schrott;
+      announce(Schrott_string);
+      current_task = Schrott_string;
+      break;
+    case 4:
+      next.B2_Schott = ! next.B2_Schott;
+      announce(Schott_string);
+      current_task = Schott_string;
+      break;
+    case 5:
+      next.B3_Evak = ! next.B3_Evak;
+      announce(Evak_string);
+      current_task = Evak_string;      
+      break;
+    case 6:
+      next.B3_Radium = ! next.B3_Radium;
+      announce(Radium_string);
+      current_task = Radium_string;      
+      break;
+    case 7:
+      next.B3_Gefahr = ! next.B3_Gefahr;
+      announce(Gefahr_string);
+      current_task = Gefahr_string;      
+      break;
+    case 8:
+      if (next.B2_SitzHeizung == 1)
+      {     
+        next.B2_SitzHeizung = 2;
+        announce(SH_medium_string);
+        current_task = SH_medium_string;        
+      }
+      else if (next.B2_SitzHeizung == 3)
+      {
+        next.B2_SitzHeizung = 2;
+        announce(SH_medium_string);
+        current_task = SH_medium_string;
+      }
+      else if (random(0,1)==0)
+      {
+        next.B2_SitzHeizung = 1;
+        announce(SH_low_string);
+        current_task = SH_low_string;        
+      }
+      else
+      {
+        next.B2_SitzHeizung = 3;
+        announce(SH_high_string);
+        current_task = SH_high_string;
+      }      
+      break;      
+    default:
+      break;
+  }  
+  
+  return next;
+
+}
+
+
+
 
 /*
 Read the current state
@@ -163,17 +298,13 @@ boolean state_matches(struct SystemState s1, struct SystemState s2)
 *
 * return: 0: first state, 1: second state, 2: Wrong state
 **/
-unsigned char compare_state(struct SystemState prev, struct SystemState next)
-{
-  struct SystemState current;
-  
-  current = read_state();
-  
-  if (state_matches(current, prev))
-    return 0;
+unsigned char compare_state(struct SystemState current, struct SystemState prev, struct SystemState next)
+{  
   if (state_matches(current, next))
     return 1;
-    
+  if (state_matches(current, prev))
+    return 0;
+
   return 2;
 }
 
@@ -204,14 +335,29 @@ void setup() {
 
   inputString.reserve(200);
 
-  randomSeed(analogRead(0));
-
   Serial.println ("event_booted");
   Serial.println ("event_gamestart");
 
+  randomSeed(analogRead(Box2_Regler)+ millis());
 }
 
+
+
+long successes = 0; // Number of successful tasks in a row
+long min_successes = 10; // Succeesses till the game iteration is won
+
+// States:
+boolean game_running = true;  // Set to true while a game is running
+boolean task_open = false;     // There is a task for the players open
+long calm_phase = 10; // counts down the calm phase between games
+
 void loop() {
+  struct SystemState current_state;
+  struct SystemState old_state;
+  struct SystemState next_state;
+  
+  unsigned char res; // result of the player jobs
+
   
   taskCounter++;
   
@@ -224,8 +370,13 @@ void loop() {
   {
     Serial.print("status_");
     Serial.println (operationMode);
-    old_state = read_state();
-    print_state(old_state);
+    
+    // Debugging, printing state to serial
+    current_state = read_state();
+    Serial.println("Debug: Current state");
+    print_state(current_state);
+    Serial.println("Debug: Target state");
+    print_state(next_state);
   }
 
   if (operationMode == enabled)
@@ -234,21 +385,100 @@ void loop() {
     // set the cursor to column 0, line 1
     // (note: line 1 is the second row, since counting begins with 0):
     lcd.setCursor(0, 1);
-    char buffer[7];
-    sprintf(buffer,"%4i",analogRead(Box2_Regler));
-    lcd.print(buffer);
+   
+   
+    if (game_running)
+    {
+      delay(1000); // Debug delay
+      Serial.println("Debug: Game running");
+      if (task_open)
+      {
+        Serial.print("Debug: Task open  ");
+        Serial.println(current_task);
+        // We already have a task. Waiting for answer or fail
+        // 3) Check for expected change. If wrong change: broken
+        if (successes > min_successes)
+        { // Game won, so far
+          game_running = false;
+          calm_phase = random(10, 30);
+          Serial.println("Debug: Game round won");
+        }
+
+        current_state = read_state();
+
+        res = compare_state(current_state, old_state, next_state);
+
+        if (res == 0)
+        { // Old state, nothing new
+          Serial.println("Debug: old state, nothing changed");
+          Serial.println("Debug: Current state");
+          print_state(current_state);
+          Serial.println("Debug: Target state");
+          print_state(next_state);
+        }
+        else if (res == 1)
+        {
+          // New state, success
+          task_open = false;
+          successes += 1;
+          Serial.println("Debug: Task success");
+        }
+        else if (res == 2)
+        {
+          // Error state
+          task_open = false;
+          game_running = false;
+          lcd.print("Failed !");
+          //operationMode = broken;
+          Serial.println("Debug: Task failed");
+        }
+        
+      }
+      else
+      {
+        Serial.println("Debug: Randomizing new task");
+        // For debouncing add delay
+        delay(50);
+        
+        // Create a new task
+        // 1) Read the current state
+        old_state = read_state();
     
-    digitalWrite(Box1_LED, digitalRead(Box3_Schloss));
-    digitalWrite(Box2_LED, digitalRead(Box3_Button_gruen));
-    digitalWrite(Box3_LED, digitalRead(Box3_Schloss));
+        // 2) Randomize a job
+        next_state = randomize_next_state(old_state);
+                
+        task_open = true;
+        
+        Serial.println("-------------");
+        current_state = read_state();
+        Serial.println("Debug: Current state");
+        print_state(current_state);
+        Serial.println("Debug: Target state");
+        print_state(next_state);
+        Serial.println("-------------");        
+      }      
+    }    
+    else
+    {
+      lcd.setCursor(0,1);
+      lcd.print("OK ");
+      lcd.println(calm_phase);      
+      if (calm_phase <= 0)
+      { // Starting game
+        game_running = true;
+        task_open = false;
+        lcd.setCursor(0,1);
+        lcd.print("Go ");
+      }
+      Serial.print("Debug: calm phase ");
+      Serial.println (calm_phase);
+      calm_phase = calm_phase - 1;
+    }
     
-    // Game goes here !
+    //digitalWrite(Box1_LED, digitalRead(Box3_Schloss));
+    //digitalWrite(Box2_LED, digitalRead(Box3_Button_gruen));
+    //digitalWrite(Box3_LED, digitalRead(Box3_Schloss));
     
-    // 1) Read the current state
-    
-    // 2) Randomize a job
-    
-    // 3) Check for expected change. If wrong change: broken
   }
   
   if (operationMode == broken)
@@ -302,7 +532,7 @@ void loop() {
   // reset input buffer
   inputString = String("");
   
-  delay (5);
+  delay (100);
 }
 
 
