@@ -271,24 +271,52 @@ struct SystemState read_state() {
 */
 boolean state_matches(struct SystemState s1, struct SystemState s2)
 {
+  Serial.println("Debug: 1");
   if (s1.B1_Musik != s2.B1_Musik)
+  {
     return false;
+  }
+  Serial.println("Debug: 2");    
   if (s1.B1_Vakuum != s2.B1_Vakuum)
+  {
     return false;
+  }
+  Serial.println("Debug: 3");    
   if (s1.B1_Radon != s2.B1_Radon)
+  {
     return false;
+  }
+  Serial.println("Debug: 4");    
   if (s1.B2_Schrott != s2.B2_Schrott)
+  {
     return false;
+  }
+  Serial.println("Debug: 5");  
   if (s1.B2_Schott != s2.B2_Schott)
+  {
     return false;
+  }
+  Serial.println("Debug: 6");  
   if (s1.B3_Evak != s2.B3_Evak)
+  {
     return false;
+  }
+  Serial.println("Debug: 7");  
   if (s1.B3_Radium != s2.B3_Radium)
+  {
     return false;
+  }
+  Serial.println("Debug: 8");  
   if (s1.B3_Gefahr != s2.B3_Gefahr)
+  {
     return false;
+  }
+  Serial.println("Debug: 9");  
   if (s1.B2_SitzHeizung != s2.B2_SitzHeizung)
+  {
     return false;
+  }
+  Serial.println("Debug: 10 and done");  
 
   return true;
   
@@ -300,8 +328,13 @@ boolean state_matches(struct SystemState s1, struct SystemState s2)
 **/
 unsigned char compare_state(struct SystemState current, struct SystemState prev, struct SystemState next)
 {  
+  Serial.println("Debug: A");
   if (state_matches(current, next))
+  {
+    Serial.println("Debug: B");
     return 1;
+  }
+  Serial.println("Debug: C");
   if (state_matches(current, prev))
     return 0;
 
@@ -396,17 +429,13 @@ void loop() {
         Serial.print("Debug: Task open  ");
         Serial.println(current_task);
         // We already have a task. Waiting for answer or fail
-        // 3) Check for expected change. If wrong change: broken
-        if (successes > min_successes)
-        { // Game won, so far
-          game_running = false;
-          calm_phase = random(10, 30);
-          Serial.println("Debug: Game round won");
-        }
+        // 3) Check for expected change. If wrong change: broken        
 
         current_state = read_state();
 
         res = compare_state(current_state, old_state, next_state);
+        Serial.print("Debug: State comparison: ");
+        Serial.println(res);
 
         if (res == 0)
         { // Old state, nothing new
@@ -433,6 +462,14 @@ void loop() {
           Serial.println("Debug: Task failed");
         }
         
+        
+        if (successes > min_successes)
+        { // Game won, so far
+          game_running = false;
+          successes = 0;
+          calm_phase = random(10, 30);
+          Serial.println("Debug: Game round won");
+        }
       }
       else
       {
@@ -463,16 +500,17 @@ void loop() {
       lcd.setCursor(0,1);
       lcd.print("OK ");
       lcd.println(calm_phase);      
+      Serial.print("Debug: calm phase ");
+      Serial.println (calm_phase);
+      calm_phase = calm_phase - 1;
+      
       if (calm_phase <= 0)
       { // Starting game
         game_running = true;
         task_open = false;
         lcd.setCursor(0,1);
         lcd.print("Go ");
-      }
-      Serial.print("Debug: calm phase ");
-      Serial.println (calm_phase);
-      calm_phase = calm_phase - 1;
+      }      
     }
     
     //digitalWrite(Box1_LED, digitalRead(Box3_Schloss));
