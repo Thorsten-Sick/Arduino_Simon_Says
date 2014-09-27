@@ -81,6 +81,8 @@ boolean game_running = true;  // Set to true while a game is running
 boolean task_open = false;     // There is a task for the players open
 long calm_phase = 10; // counts down the calm phase between games
 long game_started_at = 0; // Millis when the game started
+long games_won = 0;       // Number of games won
+long games_failed = 0;    // Number of games failed
 
 // Scrolling
 char scroll_direction = 0;
@@ -485,6 +487,7 @@ void loop() {
         print_lcd(timeout_string);
         //operationMode = broken;
         Serial.println("Debug: Task timeouted");
+        games_failed += 1;
         delay(failed_break);
       }
       
@@ -526,7 +529,7 @@ void loop() {
           task_open = false;
           game_running = false;
           print_lcd(wrong_entry_string);
-          //operationMode = broken;
+          games_failed += 1;
           Serial.println("Debug: Task failed");
           delay(failed_break);
         }
@@ -535,6 +538,7 @@ void loop() {
         { // Game won, so far
           game_running = false;
           successes = 0;
+          games_won += 1;
           calm_phase = random(10, 30);
           Serial.println("Debug: Game round won");
         }
