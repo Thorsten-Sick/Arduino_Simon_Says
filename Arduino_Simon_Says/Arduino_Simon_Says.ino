@@ -99,7 +99,7 @@ int failed_break = 10000; // Millis gamer has to wait after fail
 int debug_delay = 0;   // Delay for debugging
 int tick_delay = 100;    // Delay in every game tick
 long min_successes = 10;  // Succeesses till the game iteration is won
-long millis_for_game = 20000;  //Milliseconds to finish game
+long millis_for_game = 80000;  //Milliseconds to finish game
 
 
 /*
@@ -295,6 +295,7 @@ struct SystemState read_state() {
   return state;
 }
 
+
 /** Takes 2 states, if both are equal (with small flex. in analog) returns True
 *
 * return: True if states match, False else
@@ -342,6 +343,27 @@ boolean state_matches(struct SystemState s1, struct SystemState s2)
   
 }
 
+/* Read the debounced state
+*/
+struct SystemState read_state_debounced()
+{
+  struct SystemState statea;
+  struct SystemState stateb;
+  
+  statea = read_state();
+  delay(10);
+  stateb=read_state();
+  
+  while (!state_matches(statea,stateb))
+  {
+    statea = stateb;
+    delay(10);
+    stateb=read_state();
+  }
+  return statea;
+
+}
+
 /** Compare the current state to 2 possible states
 *
 * return: 0: first state, 1: second state, 2: Wrong state
@@ -363,7 +385,7 @@ long hash_state()
   struct SystemState state;
   long hash = 0;
   
-  state = read_state();
+  state = read_state_debounced();
   hash = 
   state.B1_Musik + 
   state.B1_Vakuum * 2 +
@@ -469,11 +491,11 @@ void loop() {
     Serial.println (operationMode);
     
     // Debugging, printing state to serial
-    current_state = read_state();
+    /*current_state = read_state_debounced();
     Serial.println("Debug: Current state");
     print_state(current_state);
     Serial.println("Debug: Target state");
-    print_state(next_state);
+    print_state(next_state);*/
   }
 
   if (operationMode == enabled)
@@ -500,7 +522,7 @@ void loop() {
         // We already have a task. Waiting for answer or fail
         // 3) Check for expected change. If wrong change: broken        
 
-        current_state = read_state();
+        current_state = read_state_debounced();
 
         res = compare_state(current_state, old_state, next_state);
         Serial.print("Debug: State comparison: ");
@@ -551,7 +573,7 @@ void loop() {
         
         // Create a new task
         // 1) Read the current state
-        old_state = read_state();
+        old_state = read_state_debounced();
     
         // 2) Randomize a job
         next_state = randomize_next_state(old_state);
@@ -559,9 +581,9 @@ void loop() {
         task_open = true;
         
         Serial.println("-------------");
-        current_state = read_state();
+        //current_state = read_state();
         Serial.println("Debug: Current state");
-        print_state(current_state);
+        print_state(old_state);
         Serial.println("Debug: Target state");
         print_state(next_state);
         Serial.println("-------------");        
