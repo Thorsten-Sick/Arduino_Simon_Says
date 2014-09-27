@@ -23,8 +23,8 @@ LiquidCrystal lcd(7, 6, 5, 4, 3, 2);
 // global operation mode
 const String disabled = String("disabled");
 const String enabled = String("enabled");
-const String broken = String("broken");
-const String testing = String("testing");
+//const String broken = String("broken");
+//const String testing = String("testing");
 String operationMode = enabled;
 
 int taskCounter = 0;
@@ -270,52 +270,42 @@ struct SystemState read_state() {
 */
 boolean state_matches(struct SystemState s1, struct SystemState s2)
 {
-  Serial.println("Debug: 1");
   if (s1.B1_Musik != s2.B1_Musik)
   {
     return false;
   }
-  Serial.println("Debug: 2");    
   if (s1.B1_Vakuum != s2.B1_Vakuum)
   {
     return false;
   }
-  Serial.println("Debug: 3");    
   if (s1.B1_Radon != s2.B1_Radon)
   {
     return false;
   }
-  Serial.println("Debug: 4");    
   if (s1.B2_Schrott != s2.B2_Schrott)
   {
     return false;
   }
-  Serial.println("Debug: 5");  
   if (s1.B2_Schott != s2.B2_Schott)
   {
     return false;
   }
-  Serial.println("Debug: 6");  
   if (s1.B3_Evak != s2.B3_Evak)
   {
     return false;
   }
-  Serial.println("Debug: 7");  
   if (s1.B3_Radium != s2.B3_Radium)
   {
     return false;
   }
-  Serial.println("Debug: 8");  
   if (s1.B3_Gefahr != s2.B3_Gefahr)
   {
     return false;
   }
-  Serial.println("Debug: 9");  
   if (s1.B2_SitzHeizung != s2.B2_SitzHeizung)
   {
     return false;
   }
-  Serial.println("Debug: 10 and done");  
 
   return true;
   
@@ -327,13 +317,10 @@ boolean state_matches(struct SystemState s1, struct SystemState s2)
 **/
 unsigned char compare_state(struct SystemState current, struct SystemState prev, struct SystemState next)
 {  
-  Serial.println("Debug: A");
   if (state_matches(current, next))
   {
-    Serial.println("Debug: B");
     return 1;
   }
-  Serial.println("Debug: C");
   if (state_matches(current, prev))
     return 0;
 
@@ -404,7 +391,6 @@ void setup() {
 
 
 long successes = 0; // Number of successful tasks in a row
-long min_successes = 10; // Succeesses till the game iteration is won
 
 // States:
 boolean game_running = true;  // Set to true while a game is running
@@ -415,6 +401,12 @@ long calm_phase = 10; // counts down the calm phase between games
 char scroll_direction = 0;
 char scroll_pos = 0;
 const char scroll_steps = 20;
+
+// Game settings
+// Use these to tune the difficulty
+int failed_break = 10000; // Millis gamer has to wait after fail
+int debug_delay = 1000;   // Delay for debugging
+long min_successes = 10;  // Succeesses till the game iteration is won
 
 void loop() {
   struct SystemState current_state;
@@ -464,10 +456,10 @@ void loop() {
   }
 
   if (operationMode == enabled)
-  {   
+  {
     if (game_running)
     {
-      delay(1000); // Debug delay
+      delay(debug_delay); // Debug delay
       Serial.println("Debug: Game running");
       if (task_open)
       {
@@ -496,6 +488,8 @@ void loop() {
           task_open = false;
           successes += 1;
           Serial.println("Debug: Task success");
+          Serial.print("Debug: Task success count");
+          Serial.println(successes);
         }
         else if (res == 2)
         {
@@ -505,8 +499,8 @@ void loop() {
           print_lcd("Failed !");
           //operationMode = broken;
           Serial.println("Debug: Task failed");
+          delay(failed_break);
         }
-        
         
         if (successes > min_successes)
         { // Game won, so far
@@ -556,10 +550,6 @@ void loop() {
     }    
   }
   
-  /*
-  
-  // External config removed temporarily. Maybe we do not need it at all
-  
   while (Serial.available())
   {
     // get the new byte:
@@ -575,16 +565,6 @@ void loop() {
       if (inputString == String("setstat_disabled"))
       {
         operationMode = disabled;
-        digitalWrite(Box1_LED, LOW);
-        digitalWrite(Box2_LED, LOW);
-        digitalWrite(Box3_LED, LOW);
-        gameFinished =true;
-      }
-
-      if (inputString == String("setstat_broken"))
-      {
-        operationMode = broken;
-        gameFinished =true;
       }
       Serial.print("status_");
       Serial.println (operationMode);
@@ -594,8 +574,7 @@ void loop() {
   }
   // reset input buffer
   inputString = String("");
-  */
-  
+
   delay (100);
 }
 
