@@ -122,8 +122,7 @@ void print_state(struct SystemState state)
 **/
 void announce(String message)
 {
-  lcd.setCursor(0, 1);
-  lcd.print(message);
+  print_lcd(message);
 }
 
 long old_changeme = -1;
@@ -363,11 +362,23 @@ long hash_state()
 
 String inputString = "";         // a string to hold incoming data
 
+
+void print_lcd(String data)
+{
+  lcd.clear();
+  lcd.print("Bugphalanx ReK:");
+  // set the cursor to column 0, line 1
+  // (note: line 1 is the second row, since counting begins with 0):
+  lcd.setCursor(0, 1);
+  lcd.print(data);
+}
+
 void setup() {
   // set up the LCD's number of columns and rows: 
   lcd.begin(16, 2);
+
   // Print a message to the LCD.
-  lcd.print("Bugphalanx ReK:");
+  
   
   pinMode(Box1_Button_gruen, INPUT_PULLUP);
   pinMode(Box1_Button_blau, INPUT_PULLUP);
@@ -400,6 +411,11 @@ boolean game_running = true;  // Set to true while a game is running
 boolean task_open = false;     // There is a task for the players open
 long calm_phase = 10; // counts down the calm phase between games
 
+// Scrolling
+char scroll_direction = 0;
+char scroll_pos = 0;
+const char scroll_steps = 20;
+
 void loop() {
   struct SystemState current_state;
   struct SystemState old_state;
@@ -407,7 +423,26 @@ void loop() {
   
   unsigned char res; // result of the player jobs
 
+  // Scrolling
+  if (scroll_direction)
+  {
+    for (int i=0;i<scroll_steps; i++)
+      lcd.scrollDisplayRight();
+    scroll_direction = 1;
+  }
+  else
+  {
+    lcd.scrollDisplayLeft();
+  }
+  scroll_pos += 1;
+  if (scroll_pos > scroll_steps)
+  {
+    scroll_pos = 0;
+    scroll_direction != scroll_direction;
+  }
   
+  
+  // Timed status updates
   taskCounter++;
   
   if (taskCounter == 2000)  // wrap around every 10 Seconds
@@ -429,13 +464,7 @@ void loop() {
   }
 
   if (operationMode == enabled)
-  {
-
-    // set the cursor to column 0, line 1
-    // (note: line 1 is the second row, since counting begins with 0):
-    lcd.setCursor(0, 1);
-   
-   
+  {   
     if (game_running)
     {
       delay(1000); // Debug delay
@@ -473,7 +502,7 @@ void loop() {
           // Error state
           task_open = false;
           game_running = false;
-          lcd.print("Failed !");
+          print_lcd("Failed !");
           //operationMode = broken;
           Serial.println("Debug: Task failed");
         }
@@ -513,9 +542,7 @@ void loop() {
     }    
     else
     {
-      lcd.setCursor(0,1);
-      lcd.print("OK ");
-      lcd.println(calm_phase);      
+      print_lcd("OK ");
       Serial.print("Debug: calm phase ");
       Serial.println (calm_phase);
       calm_phase = calm_phase - 1;
@@ -524,28 +551,15 @@ void loop() {
       { // Starting game
         game_running = true;
         task_open = false;
-        lcd.setCursor(0,1);
-        lcd.print("Go ");
+        print_lcd("Go");
       }      
     }    
   }
   
-  if (operationMode == broken)
-  {
-    if (brokenCounter == 0)
-    {
-      digitalWrite(Box1_LED, random (1));
-      digitalWrite(Box2_LED, random (1));
-      digitalWrite(Box3_LED, random (1));
-      
-      brokenCounter = random (30);
-    }
-    else
-    {
-      brokenCounter--;
-    }
-  }
-
+  /*
+  
+  // External config removed temporarily. Maybe we do not need it at all
+  
   while (Serial.available())
   {
     // get the new byte:
@@ -580,6 +594,7 @@ void loop() {
   }
   // reset input buffer
   inputString = String("");
+  */
   
   delay (100);
 }
