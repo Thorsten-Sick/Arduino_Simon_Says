@@ -56,6 +56,8 @@ struct SystemState{
   unsigned char B3_Gefahr;
 };
 
+const String failed_string = String("Failed !");
+const String bugphalanx = String("Bugphalanx Rekonfigurieren:");
 const String Musik_string = String("Musik aus um Strom zu sparen");
 const String Vakuum_string = String("Vakuum in Dunkelkammer einlassen");
 const String Radon_string = String("Radon magnetisieren");
@@ -70,6 +72,31 @@ const String SH_medium_string = String("Sitzheizung auf Medium");
 const String SH_high_string = String("Sitzheizung auf High");
 
 String current_task = String();
+
+long successes = 0; // Number of successful tasks in a row
+
+// States:
+boolean game_running = true;  // Set to true while a game is running
+boolean task_open = false;     // There is a task for the players open
+long calm_phase = 10; // counts down the calm phase between games
+
+// Scrolling
+char scroll_direction = 0;
+char scroll_pos = 0;
+const char scroll_steps = 20;
+unsigned long last_scroll_at=0;      // When the last scroll step happened
+unsigned long millis_per_scroll=500;  // Milliseconde till the next scroll step
+const int scroll_countdown_start = 10; // Setting init for scroll countdown
+int scroll_countdown = scroll_countdown_start; // Iterations till scrolling starts
+
+// Game settings
+// Use these to tune the difficulty
+int failed_break = 10000; // Millis gamer has to wait after fail
+int debug_delay = 0;   // Delay for debugging
+int tick_delay = 100;    // Delay in every game tick
+long min_successes = 10;  // Succeesses till the game iteration is won
+
+
 
 /*
  Extra function, we will need debouncing
@@ -353,11 +380,12 @@ String inputString = "";         // a string to hold incoming data
 void print_lcd(String data)
 {
   lcd.clear();
-  lcd.print("Bugphalanx ReK:");
+  lcd.print(bugphalanx);
   // set the cursor to column 0, line 1
   // (note: line 1 is the second row, since counting begins with 0):
   lcd.setCursor(0, 1);
   lcd.print(data);
+  scroll_countdown = scroll_countdown_start;
 }
 
 void setup() {
@@ -389,25 +417,6 @@ void setup() {
 }
 
 
-
-long successes = 0; // Number of successful tasks in a row
-
-// States:
-boolean game_running = true;  // Set to true while a game is running
-boolean task_open = false;     // There is a task for the players open
-long calm_phase = 10; // counts down the calm phase between games
-
-// Scrolling
-char scroll_direction = 0;
-char scroll_pos = 0;
-const char scroll_steps = 20;
-
-// Game settings
-// Use these to tune the difficulty
-int failed_break = 10000; // Millis gamer has to wait after fail
-int debug_delay = 1000;   // Delay for debugging
-long min_successes = 10;  // Succeesses till the game iteration is won
-
 void loop() {
   struct SystemState current_state;
   struct SystemState old_state;
@@ -416,21 +425,29 @@ void loop() {
   unsigned char res; // result of the player jobs
 
   // Scrolling
-  if (scroll_direction)
+  if (last_scroll_at + millis_per_scroll < millis())
   {
-    for (int i=0;i<scroll_steps; i++)
-      lcd.scrollDisplayRight();
-    scroll_direction = 1;
-  }
-  else
-  {
-    lcd.scrollDisplayLeft();
-  }
-  scroll_pos += 1;
-  if (scroll_pos > scroll_steps)
-  {
-    scroll_pos = 0;
-    scroll_direction != scroll_direction;
+    last_scroll_at = millis();
+    scroll_countdown -= 1;
+    if (scroll_countdown <= 0)
+    {
+      if (scroll_direction)
+      {
+        for (int i=0;i<scroll_steps; i++)
+          lcd.scrollDisplayRight();
+        scroll_direction = 1;
+      }
+      else
+      {
+        lcd.scrollDisplayLeft();
+      }
+      scroll_pos += 1;
+      if (scroll_pos > scroll_steps)
+      {
+        scroll_pos = 0;
+        scroll_direction != scroll_direction;
+      }
+    }
   }
   
   
@@ -496,7 +513,7 @@ void loop() {
           // Error state
           task_open = false;
           game_running = false;
-          print_lcd("Failed !");
+          print_lcd(failed_string);
           //operationMode = broken;
           Serial.println("Debug: Task failed");
           delay(failed_break);
@@ -532,11 +549,11 @@ void loop() {
         Serial.println("Debug: Target state");
         print_state(next_state);
         Serial.println("-------------");        
-      }      
-    }    
+      }
+    }
     else
     {
-      print_lcd("OK ");
+      print_lcd("System OK ");
       Serial.print("Debug: calm phase ");
       Serial.println (calm_phase);
       calm_phase = calm_phase - 1;
@@ -545,11 +562,11 @@ void loop() {
       { // Starting game
         game_running = true;
         task_open = false;
-        print_lcd("Go");
       }      
     }    
   }
   
+  // Serial control for external controller
   while (Serial.available())
   {
     // get the new byte:
@@ -575,7 +592,7 @@ void loop() {
   // reset input buffer
   inputString = String("");
 
-  delay (100);
+  delay (tick_delay);
 }
 
 
