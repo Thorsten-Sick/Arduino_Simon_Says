@@ -56,7 +56,8 @@ struct SystemState{
   unsigned char B3_Gefahr;
 };
 
-const String failed_string = String("Failed !");
+const String wrong_entry_string = String("Falscheingabe");
+const String timeout_string = String("Zeit abgelaufen");
 const String bugphalanx = String("Bugphalanx Rekonfigurieren:");
 const String Musik_string = String("Musik aus um Strom zu sparen");
 const String Vakuum_string = String("Vakuum in Dunkelkammer einlassen");
@@ -79,11 +80,12 @@ long successes = 0; // Number of successful tasks in a row
 boolean game_running = true;  // Set to true while a game is running
 boolean task_open = false;     // There is a task for the players open
 long calm_phase = 10; // counts down the calm phase between games
+long game_started_at = 0; // Millis when the game started
 
 // Scrolling
 char scroll_direction = 0;
 char scroll_pos = 0;
-const char scroll_steps = 20;
+const char scroll_steps = 30;
 unsigned long last_scroll_at=0;      // When the last scroll step happened
 unsigned long millis_per_scroll=500;  // Milliseconde till the next scroll step
 const int scroll_countdown_start = 10; // Setting init for scroll countdown
@@ -95,7 +97,7 @@ int failed_break = 10000; // Millis gamer has to wait after fail
 int debug_delay = 0;   // Delay for debugging
 int tick_delay = 100;    // Delay in every game tick
 long min_successes = 10;  // Succeesses till the game iteration is won
-
+long millis_for_game = 20000;  //Milliseconds to finish game
 
 
 /*
@@ -476,6 +478,16 @@ void loop() {
   {
     if (game_running)
     {
+      if (game_started_at + millis_for_game < millis())
+      {
+        task_open = false;
+        game_running = false;
+        print_lcd(timeout_string);
+        //operationMode = broken;
+        Serial.println("Debug: Task timeouted");
+        delay(failed_break);
+      }
+      
       delay(debug_delay); // Debug delay
       Serial.println("Debug: Game running");
       if (task_open)
@@ -513,7 +525,7 @@ void loop() {
           // Error state
           task_open = false;
           game_running = false;
-          print_lcd(failed_string);
+          print_lcd(wrong_entry_string);
           //operationMode = broken;
           Serial.println("Debug: Task failed");
           delay(failed_break);
@@ -562,8 +574,9 @@ void loop() {
       { // Starting game
         game_running = true;
         task_open = false;
-      }      
-    }    
+        game_started_at = millis();
+      }
+    }
   }
   
   // Serial control for external controller
