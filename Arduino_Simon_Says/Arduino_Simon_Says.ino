@@ -341,7 +341,25 @@ unsigned char compare_state(struct SystemState current, struct SystemState prev,
   return 2;
 }
 
-
+long hash_state()
+{
+  struct SystemState state;
+  long hash = 0;
+  
+  state = read_state();
+  hash = 
+  state.B1_Musik + 
+  state.B1_Vakuum * 2 +
+  state.B1_Radon * 4 +
+  state.B2_Schrott * 8 +
+  state.B2_Schott * 16 +
+  state.B3_Evak * 32 +
+  state.B3_Radium * 64 +
+  state.B3_Gefahr * 128 +
+  state.B2_SitzHeizung * 256;
+  
+  return hash;
+}
 
 String inputString = "";         // a string to hold incoming data
 
@@ -367,11 +385,9 @@ void setup() {
   Serial.begin(9600); 
 
   inputString.reserve(200);
-
+  randomSeed(hash_state());
   Serial.println ("event_booted");
-  Serial.println ("event_gamestart");
-
-  randomSeed(analogRead(Box2_Regler)+ millis());
+  Serial.println ("event_gamestart");  
 }
 
 
@@ -511,12 +527,7 @@ void loop() {
         lcd.setCursor(0,1);
         lcd.print("Go ");
       }      
-    }
-    
-    //digitalWrite(Box1_LED, digitalRead(Box3_Schloss));
-    //digitalWrite(Box2_LED, digitalRead(Box3_Button_gruen));
-    //digitalWrite(Box3_LED, digitalRead(Box3_Schloss));
-    
+    }    
   }
   
   if (operationMode == broken)
