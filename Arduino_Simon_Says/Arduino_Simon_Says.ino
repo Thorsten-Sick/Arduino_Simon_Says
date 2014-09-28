@@ -20,44 +20,33 @@ LCD: ok
 // SmartMaker special
 LiquidCrystal lcd(7, 6, 5, 4, 3, 2);
 
-// global operation mode
-const String disabled = String("disabled");
-const String enabled = String("enabled");
-//const String broken = String("broken");
-//const String testing = String("testing");
-String operationMode = enabled;
+/////////////////////////////////////////////////////////////////
+// Game settings
+/////////////////////////////////////////////////////////////////
+// Use these to tune the difficulty
+int failed_break = 10000; // Millis gamer has to wait after fail
+int debug_delay = 0;   // Delay for debugging
+int tick_delay = 100;    // Delay in every game tick
+long min_successes = 10;  // Succeesses till the game iteration is won
+long millis_for_game = 80000;  //Milliseconds to finish game
+boolean debug = false; // Debug on ?
 
-int taskCounter = 0;
-int brokenCounter = 0;
-boolean gameFinished = false;
+// Time adjustment
+int milli_diff_on_success = -5000;  // Change in time if the player succeeds. <0 makes it more difficult, 0 for off
+int milli_diff_on_fail = 5000;      // Change in time if the player fails. <0 makes it more difficult, 0 for off
+long max_millis = 120000;          // maximum time the player will get
+long min_millis = 50000;           // minimum time the player will get
 
-const unsigned char Box1_Button_gruen = 12; //gelb: Musik
-const unsigned char Box1_Button_blau = 11;  // Vakuumeinlass
-const unsigned char Box1_Schloss = 10;  // Radon
-const unsigned char Box1_LED = 13;
-const unsigned char Box2_Button_gruen = 8;  // Schrott abwurf
-const unsigned char Box2_Regler = A5;  // SitzHeizung L-M-H   // 15-136
-const unsigned char Box2_Schloss = A4;  // Schott
-const unsigned char Box2_LED = 9;
-const unsigned char Box3_Button_gruen = 1;  // Evak
-const unsigned char Box3_Button_blau = A1; // gelb  Radium
-const unsigned char Box3_Schloss = A0;  // Gefahr
-const unsigned char Box3_LED = A3;
+// use LEDs to indicate processing state
+boolean use_processing = true;   // If a input is done during processing, it is an error
+int processing_time = 1000;      // millis the processing will last
+int processing_chance = 1;       // The higher, the more unlikely it is to get into processing. 1 is: for sure
 
-struct SystemState{
-  unsigned char B1_Musik;
-  unsigned char B1_Vakuum;
-  unsigned char B1_Radon;
-  unsigned char B2_Schrott;
-  unsigned char B2_SitzHeizung;
-  unsigned char B2_Schott;  
-  unsigned char B3_Evak;
-  unsigned char B3_Radium;
-  unsigned char B3_Gefahr;
-};
-
+//////////////////////////////////////////////////////////////////
+// Strings for LCD
 const String wrong_entry_string = String("Falscheingabe");
 const String timeout_string = String("Zeit abgelaufen");
+const String processing_string = String("Verarbeitungs Err");
 const String bugphalanx = String("Bugphalanx Rekonfigurieren:");
 const String Musik_string = String("Musik aus um Strom zu sparen");
 const String Vakuum_string = String("Vakuum in Dunkelkammer einlassen");
@@ -71,6 +60,48 @@ const String Gefahr_string = String("Gefahren - Anzeige aus um Panik zu vermeide
 const String SH_low_string = String("Sitzheizung auf Low");
 const String SH_medium_string = String("Sitzheizung auf Medium");
 const String SH_high_string = String("Sitzheizung auf High");
+///////////////////////////////////////////////////////////////////////
+// Settings for PINS
+const unsigned char Box1_Button_gruen = 12; //gelb: Musik
+const unsigned char Box1_Button_blau = 11;  // Vakuumeinlass
+const unsigned char Box1_Schloss = 10;  // Radon
+const unsigned char Box1_LED = 13;
+const unsigned char Box2_Button_gruen = 8;  // Schrott abwurf
+const unsigned char Box2_Regler = A5;  // SitzHeizung L-M-H   // 15-136
+const unsigned char Box2_Schloss = A4;  // Schott
+const unsigned char Box2_LED = 9;
+const unsigned char Box3_Button_gruen = 1;  // Evak
+const unsigned char Box3_Button_blau = A1; // gelb  Radium
+const unsigned char Box3_Schloss = A0;  // Gefahr
+const unsigned char Box3_LED = A3;
+/////////////////////////////////////////////////////////////////////
+
+
+// global operation mode
+const String disabled = String("disabled");
+const String enabled = String("enabled");
+//const String broken = String("broken");
+//const String testing = String("testing");
+String operationMode = enabled;
+
+int taskCounter = 0;
+int brokenCounter = 0;
+boolean gameFinished = false;
+boolean is_processing = false;  // The processing LED is on
+long processing_started_at = 0;
+
+
+struct SystemState{
+  unsigned char B1_Musik;
+  unsigned char B1_Vakuum;
+  unsigned char B1_Radon;
+  unsigned char B2_Schrott;
+  unsigned char B2_SitzHeizung;
+  unsigned char B2_Schott;  
+  unsigned char B3_Evak;
+  unsigned char B3_Radium;
+  unsigned char B3_Gefahr;
+};
 
 String current_task = String();
 
@@ -93,23 +124,6 @@ unsigned long millis_per_scroll=500;  // Milliseconde till the next scroll step
 const int scroll_countdown_start = 10; // Setting init for scroll countdown
 int scroll_countdown = scroll_countdown_start; // Iterations till scrolling starts
 
-/////////////////////////////////////////////////////////////////
-// Game settings
-/////////////////////////////////////////////////////////////////
-// Use these to tune the difficulty
-int failed_break = 10000; // Millis gamer has to wait after fail
-int debug_delay = 0;   // Delay for debugging
-int tick_delay = 100;    // Delay in every game tick
-long min_successes = 10;  // Succeesses till the game iteration is won
-long millis_for_game = 80000;  //Milliseconds to finish game
-boolean debug = false; // Debug on ?
-
-int milli_diff_on_success = -500;  // Change in time if the player succeeds. <0 makes it more difficult, 0 for off
-int milli_diff_on_fail = 500;      // Change in time if the player fails. <0 makes it more difficult, 0 for off
-long max_millis = 120000;          // maximum time the player will get
-long min_millis = 50000;           // minimum time the player will get
-
-//////////////////////////////////////////////////////////////////
 
 /*
  Extra function, we will need debouncing
@@ -170,7 +184,6 @@ long old_changeme = -1;
 /* Generate a new state with only a small difference
 *
 */
-
 struct SystemState randomize_next_state(struct SystemState current)
 {
   struct SystemState next;
@@ -189,6 +202,7 @@ struct SystemState randomize_next_state(struct SystemState current)
   
   // Identify button to change
   
+  changeme = random(0,9);  
   while (changeme == old_changeme)
   {
     changeme = random(0,9);  
@@ -386,6 +400,10 @@ unsigned char compare_state(struct SystemState current, struct SystemState prev,
   return 2;
 }
 
+/** Create a hash from current state
+*
+*
+**/
 long hash_state()
 {
   struct SystemState state;
@@ -420,29 +438,37 @@ void print_lcd(String data)
   scroll_countdown = scroll_countdown_start;
 }
 
-void leds_off(){
+void processing_off(){
+  Serial.println("Debug: Processing off");
   digitalWrite(Box1_LED, LOW);
   digitalWrite(Box2_LED, LOW);
   digitalWrite(Box3_LED, LOW);
+  is_processing = false;
 }
 
 /** Switch a random led on
 *
 **/
-void random_led_on()
-{
+void processing_on()
+{  
   char id = random (1,4);
-  switch (id)
+  if (!is_processing)
   {
-    case 1:
-        digitalWrite(Box1_LED, HIGH);
-        break;
-    case 2:
-        digitalWrite(Box2_LED, HIGH);
-        break;
-    case 3:
-        digitalWrite(Box3_LED, HIGH);
-        break;
+    Serial.println("Debug: Processing on");
+    switch (id)
+    {
+      case 1:
+          digitalWrite(Box1_LED, HIGH);
+          break;
+      case 2:
+          digitalWrite(Box2_LED, HIGH);
+          break;
+      case 3:
+          digitalWrite(Box3_LED, HIGH);
+          break;
+    }
+    is_processing = true;
+    processing_started_at = millis();
   }
 }
 
@@ -558,6 +584,11 @@ void loop() {
     millis_for_game = max_millis;
   }
 
+  // Processing off ?
+  if ((processing_on) && (processing_started_at + processing_time < millis()))
+  {
+    processing_off();
+  }
 
   // Game part
   if (operationMode == enabled)
@@ -566,6 +597,7 @@ void loop() {
     {
       if (game_started_at + millis_for_game < millis())
       {
+        processing_off();
         task_open = false;
         game_running = false;
         print_lcd(timeout_string);
@@ -608,14 +640,30 @@ void loop() {
         else if (res == 1)
         {
           // New state, success
-          task_open = false;
-          successes += 1;
-          Serial.println("Debug: Task success");
-          serial_print_stats();
+          if (is_processing)
+          { // Fail, system is processing
+            processing_off();
+            task_open = false;
+            game_running = false;
+            print_lcd(processing_string);
+            games_failed += 1;
+            Serial.println("Debug: Task failed while processing");
+            millis_for_game += milli_diff_on_fail;
+            serial_print_stats();
+            delay(failed_break);
+          }
+          else
+          {
+            task_open = false;
+            successes += 1;
+            Serial.println("Debug: Task success");
+            serial_print_stats();
+          }
         }
         else if (res == 2)
         {
           // Error state
+          processing_off();
           task_open = false;
           game_running = false;
           print_lcd(wrong_entry_string);
@@ -642,8 +690,13 @@ void loop() {
         Serial.println("Debug: Randomizing new task");
         // For debouncing add delay
         //delay(50);
-        leds_off();
-        random_led_on();
+        if (use_processing)
+        {
+          if (random(0,processing_chance) == 0)
+          {
+            processing_on();
+          }
+        }
         
         // Create a new task
         // 1) Read the current state
