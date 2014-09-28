@@ -93,7 +93,9 @@ unsigned long millis_per_scroll=500;  // Milliseconde till the next scroll step
 const int scroll_countdown_start = 10; // Setting init for scroll countdown
 int scroll_countdown = scroll_countdown_start; // Iterations till scrolling starts
 
+/////////////////////////////////////////////////////////////////
 // Game settings
+/////////////////////////////////////////////////////////////////
 // Use these to tune the difficulty
 int failed_break = 10000; // Millis gamer has to wait after fail
 int debug_delay = 0;   // Delay for debugging
@@ -101,6 +103,13 @@ int tick_delay = 100;    // Delay in every game tick
 long min_successes = 10;  // Succeesses till the game iteration is won
 long millis_for_game = 80000;  //Milliseconds to finish game
 boolean debug = false; // Debug on ?
+
+int milli_diff_on_success = -500;  // Change in time if the player succeeds. <0 makes it more difficult, 0 for off
+int milli_diff_on_fail = 500;      // Change in time if the player fails. <0 makes it more difficult, 0 for off
+long max_millis = 120000;          // maximum time the player will get
+long min_millis = 50000;           // minimum time the player will get
+
+//////////////////////////////////////////////////////////////////
 
 /*
  Extra function, we will need debouncing
@@ -539,6 +548,18 @@ void loop() {
     serial_print_stats();
   }
 
+  // Millis adjustment
+  if (millis_for_game < min_millis)
+  {
+    millis_for_game = min_millis;
+  }
+  if (millis_for_game > max_millis)
+  {
+    millis_for_game = max_millis;
+  }
+
+
+  // Game part
   if (operationMode == enabled)
   {
     if (game_running)
@@ -548,8 +569,8 @@ void loop() {
         task_open = false;
         game_running = false;
         print_lcd(timeout_string);
-        //operationMode = broken;
         Serial.println("Debug: Task timeouted");
+        millis_for_game += milli_diff_on_fail;
         games_failed += 1;
         serial_print_stats();
         delay(failed_break);
@@ -600,6 +621,7 @@ void loop() {
           print_lcd(wrong_entry_string);
           games_failed += 1;
           Serial.println("Debug: Task failed");
+          millis_for_game += milli_diff_on_fail;
           serial_print_stats();
           delay(failed_break);
         }
@@ -610,8 +632,9 @@ void loop() {
           successes = 0;
           games_won += 1;
           calm_phase = random(10, 30);
-          serial_print_stats();
-          Serial.println("Debug: Game round won");
+          millis_for_game += milli_diff_on_success;          
+          Serial.println("Debug: Game round won");          
+          serial_print_stats();          
         }
       }
       else
