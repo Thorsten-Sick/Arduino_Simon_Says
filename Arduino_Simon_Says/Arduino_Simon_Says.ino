@@ -39,8 +39,8 @@ long min_millis = 50000;           // minimum time the player will get
 
 // use LEDs to indicate processing state
 boolean use_processing = true;   // If a input is done during processing, it is an error
-int processing_time = 1000;      // millis the processing will last
-int processing_chance = 1;       // The higher, the more unlikely it is to get into processing. 1 is: for sure
+int processing_time = 2000;      // millis the processing will last
+int processing_chance = 6;       // The higher, the more unlikely it is to get into processing. 1 is: for sure
 
 //////////////////////////////////////////////////////////////////
 // Strings for LCD
