@@ -55,11 +55,11 @@ const String Schrott_string = String("Schrott abwerfen");
 const String Schott_string = String("Schott schliessen");
 const String Evak_string = String("Evakuierung vorbereiten");
 const String Radium_string = String("Radium inhalator vorbereiten");
-const String Gefahr_string = String("Gefahren - Anzeige aus um Panik zu vermeiden");
+const String Gefahr_string = String("Gefahrenanzeige umschalten");
 
-const String SH_low_string = String("Sitzheizung auf Low");
-const String SH_medium_string = String("Sitzheizung auf Medium");
-const String SH_high_string = String("Sitzheizung auf High");
+const String SH_low_string = String("Sitzheizung: Low");
+const String SH_medium_string = String("Sitzheizung: Medium");
+const String SH_high_string = String("Sitzheizung: High");
 ///////////////////////////////////////////////////////////////////////
 // Settings for PINS
 const unsigned char Box1_Button_gruen = 12; //gelb: Musik
@@ -124,6 +124,11 @@ unsigned long millis_per_scroll=500;  // Milliseconde till the next scroll step
 const int scroll_countdown_start = 10; // Setting init for scroll countdown
 int scroll_countdown = scroll_countdown_start; // Iterations till scrolling starts
 
+
+// States
+struct SystemState current_state;
+struct SystemState old_state;
+struct SystemState next_state;
 
 /*
  Extra function, we will need debouncing
@@ -307,7 +312,7 @@ struct SystemState read_state() {
   regler = read_slide(Box2_Regler);
   if  (regler < 55)
     state.B2_SitzHeizung = 1;
-  else if  (regler < 90)
+  else if (regler < 90)
     state.B2_SitzHeizung = 2;
   else
     state.B2_SitzHeizung = 3;
@@ -371,13 +376,13 @@ struct SystemState read_state_debounced()
   struct SystemState stateb;
   
   statea = read_state();
-  delay(10);
+  delay(100);
   stateb=read_state();
-  
+ 
   while (!state_matches(statea,stateb))
   {
     statea = stateb;
-    delay(10);
+    delay(100);
     stateb=read_state();
   }
   return statea;
@@ -439,11 +444,16 @@ void print_lcd(String data)
 }
 
 void processing_off(){
-  Serial.println("Debug: Processing off");
+  if (is_processing)
+  {
+    Serial.println("Debug: Processing off");
+    is_processing = false;
+  }
+  
   digitalWrite(Box1_LED, LOW);
   digitalWrite(Box2_LED, LOW);
   digitalWrite(Box3_LED, LOW);
-  is_processing = false;
+  
 }
 
 /** Switch a random led on
@@ -477,11 +487,15 @@ void processing_on()
 **/
 void serial_print_stats()
 {
-  struct SystemState current_state;
+  //struct SystemState current_state;
     
-  current_state = read_state_debounced();
+  //current_state = read_state_debounced();
   Serial.println("Stats: Current state: ");
   print_state(current_state);
+  Serial.println("Stats: Next state: ");
+  print_state(next_state);
+  Serial.print("Stats: Current task: ");
+  Serial.println(current_task);
   Serial.print("Stats: Fails since start: ");
   Serial.println(games_failed);
   Serial.print("Stats: Won since start: ");
@@ -524,11 +538,7 @@ void setup() {
 }
 
 
-void loop() {
-  struct SystemState current_state;
-  struct SystemState old_state;
-  struct SystemState next_state;
-  
+void loop() {  
   unsigned char res; // result of the player jobs
 
   // Scrolling
@@ -668,7 +678,7 @@ void loop() {
           game_running = false;
           print_lcd(wrong_entry_string);
           games_failed += 1;
-          Serial.println("Debug: Task failed");
+          Serial.println("Debug: Task failed, wrong entry");
           millis_for_game += milli_diff_on_fail;
           serial_print_stats();
           delay(failed_break);
