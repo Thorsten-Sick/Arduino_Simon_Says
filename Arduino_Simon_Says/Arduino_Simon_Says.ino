@@ -182,7 +182,7 @@ struct SystemState randomize_next_state(struct SystemState current)
   
   while (changeme == old_changeme)
   {
-    changeme = random(0,8);  
+    changeme = random(0,9);  
   }
   old_changeme = changeme;
 
@@ -244,7 +244,7 @@ struct SystemState randomize_next_state(struct SystemState current)
         announce(SH_medium_string);
         current_task = SH_medium_string;
       }
-      else if (random(0,1)==0)
+      else if (random(0,2)==0)
       {
         next.B2_SitzHeizung = 1;
         announce(SH_low_string);
@@ -414,6 +414,32 @@ void print_lcd(String data)
   scroll_countdown = scroll_countdown_start;
 }
 
+void leds_off(){
+  digitalWrite(Box1_LED, LOW);
+  digitalWrite(Box2_LED, LOW);
+  digitalWrite(Box3_LED, LOW);
+}
+
+/** Switch a random led on
+*
+**/
+void random_led_on()
+{
+  char id = random (1,4);
+  switch (id)
+  {
+    case 1:
+        digitalWrite(Box1_LED, HIGH);
+        break;
+    case 2:
+        digitalWrite(Box2_LED, HIGH);
+        break;
+    case 3:
+        digitalWrite(Box3_LED, HIGH);
+        break;
+  }
+}
+
 void setup() {
   // set up the LCD's number of columns and rows: 
   lcd.begin(16, 2);
@@ -569,7 +595,9 @@ void loop() {
       {
         Serial.println("Debug: Randomizing new task");
         // For debouncing add delay
-        delay(50);
+        //delay(50);
+        leds_off();
+        random_led_on();
         
         // Create a new task
         // 1) Read the current state
