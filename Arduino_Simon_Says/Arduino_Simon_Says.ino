@@ -100,7 +100,7 @@ int debug_delay = 0;   // Delay for debugging
 int tick_delay = 100;    // Delay in every game tick
 long min_successes = 10;  // Succeesses till the game iteration is won
 long millis_for_game = 80000;  //Milliseconds to finish game
-
+boolean debug = false; // Debug on ?
 
 /*
  Extra function, we will need debouncing
@@ -185,9 +185,6 @@ struct SystemState randomize_next_state(struct SystemState current)
     changeme = random(0,9);  
   }
   old_changeme = changeme;
-
-  Serial.print("Debug: Randomizing....");
-  Serial.println(changeme);
   
   // modify and announce
   switch (changeme){
@@ -440,6 +437,29 @@ void random_led_on()
   }
 }
 
+/** Serial print statistics
+*
+**/
+void serial_print_stats()
+{
+  struct SystemState current_state;
+    
+  current_state = read_state_debounced();
+  Serial.println("Stats: Current state: ");
+  print_state(current_state);
+  Serial.print("Stats: Fails since start: ");
+  Serial.println(games_failed);
+  Serial.print("Stats: Won since start: ");
+  Serial.println(games_won);  
+  Serial.print("Stats: running: ");
+  Serial.println(game_running);
+  Serial.print("Stats: Task open: ");
+  Serial.println(task_open);  
+  Serial.print("Stats: Millis for game: ");
+  Serial.println(millis_for_game);
+}
+
+
 void setup() {
   // set up the LCD's number of columns and rows: 
   lcd.begin(16, 2);
@@ -516,12 +536,7 @@ void loop() {
     Serial.print("status_");
     Serial.println (operationMode);
     
-    // Debugging, printing state to serial
-    /*current_state = read_state_debounced();
-    Serial.println("Debug: Current state");
-    print_state(current_state);
-    Serial.println("Debug: Target state");
-    print_state(next_state);*/
+    serial_print_stats();
   }
 
   if (operationMode == enabled)
@@ -536,31 +551,38 @@ void loop() {
         //operationMode = broken;
         Serial.println("Debug: Task timeouted");
         games_failed += 1;
+        serial_print_stats();
         delay(failed_break);
       }
       
       delay(debug_delay); // Debug delay
-      Serial.println("Debug: Game running");
+      if (debug)
+        Serial.println("Debug: Game running");
       if (task_open)
       {
-        Serial.print("Debug: Task open  ");
-        Serial.println(current_task);
+        if (debug)
+        {
+          Serial.print("Debug: Task open  ");
+          Serial.println(current_task);
+        }
         // We already have a task. Waiting for answer or fail
         // 3) Check for expected change. If wrong change: broken        
 
         current_state = read_state_debounced();
 
         res = compare_state(current_state, old_state, next_state);
-        Serial.print("Debug: State comparison: ");
-        Serial.println(res);
 
         if (res == 0)
-        { // Old state, nothing new
-          Serial.println("Debug: old state, nothing changed");
-          Serial.println("Debug: Current state");
-          print_state(current_state);
-          Serial.println("Debug: Target state");
-          print_state(next_state);
+        { 
+          if (debug)
+          {
+            // Old state, nothing new
+            Serial.println("Debug: old state, nothing changed");
+            Serial.println("Debug: Current state");
+            print_state(current_state);
+            Serial.println("Debug: Target state");
+            print_state(next_state);
+          }
         }
         else if (res == 1)
         {
@@ -568,8 +590,7 @@ void loop() {
           task_open = false;
           successes += 1;
           Serial.println("Debug: Task success");
-          Serial.print("Debug: Task success count");
-          Serial.println(successes);
+          serial_print_stats();
         }
         else if (res == 2)
         {
@@ -579,6 +600,7 @@ void loop() {
           print_lcd(wrong_entry_string);
           games_failed += 1;
           Serial.println("Debug: Task failed");
+          serial_print_stats();
           delay(failed_break);
         }
         
@@ -588,6 +610,7 @@ void loop() {
           successes = 0;
           games_won += 1;
           calm_phase = random(10, 30);
+          serial_print_stats();
           Serial.println("Debug: Game round won");
         }
       }
@@ -608,13 +631,16 @@ void loop() {
                 
         task_open = true;
         
-        Serial.println("-------------");
-        //current_state = read_state();
-        Serial.println("Debug: Current state");
-        print_state(old_state);
-        Serial.println("Debug: Target state");
-        print_state(next_state);
-        Serial.println("-------------");        
+        if (debug)
+        {
+          Serial.println("-------------");
+          //current_state = read_state();
+          Serial.println("Debug: Current state");
+          print_state(old_state);
+          Serial.println("Debug: Target state");
+          print_state(next_state);
+          Serial.println("-------------"); 
+        }       
       }
     }
     else
